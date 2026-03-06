@@ -1,0 +1,158 @@
+NESTJS NOTES – DYNAMIC MODULES & PROVIDERS
+
+1. Dynamic Modules
+
+Dynamic modules allow a module to be configured when it is imported.
+
+Instead of static configuration, values can be passed while importing
+the module.
+
+Example use cases: - Database connection modules - Authentication
+modules - Configuration modules
+
+Basic Structure:
+
+import { Module, DynamicModule } from ‘@nestjs/common’;
+
+@Module({}) export class ConfigModule {
+
+static register(options): DynamicModule { return { module: ConfigModule,
+providers: [ { provide: ‘CONFIG_OPTIONS’, useValue: options, } ],
+exports: [‘CONFIG_OPTIONS’] }; }
+
+}
+
+Usage:
+
+@Module({ imports: [ ConfigModule.register({ folder: ‘./config’ }) ] })
+
+Explanation: register() → Method returning a DynamicModule module →
+Current module providers → services created dynamically exports → makes
+provider available to other modules
+
+2. registerAsync
+
+registerAsync is used when configuration must be loaded asynchronously.
+
+Example: Loading config from environment variables or external services.
+
+Structure:
+
+Module.registerAsync({ useFactory: async () => { return { secret:
+“mysecret” }; } })
+
+Example:
+
+JwtModule.registerAsync({ useFactory: async () => ({ secret:
+process.env.JWT_SECRET }) })
+
+Explanation: registerAsync allows async logic before module
+initialization.
+
+3. useFactory
+
+useFactory allows creating providers dynamically using a function.
+
+Example:
+
+{ provide: ‘DATABASE_CONNECTION’, useFactory: () => { return
+createConnection(); } }
+
+Async example:
+
+{ provide: ‘API_CONFIG’, useFactory: async () => { return { apiKey:
+“123” }; } }
+
+Explanation: Factory functions generate values at runtime.
+
+4. inject (Dependency Injection inside Factory)
+
+inject allows passing dependencies into useFactory.
+
+Example:
+
+{ provide: ‘SERVICE_CONFIG’, useFactory: (configService) => { return {
+url: configService.getUrl() }; }, inject: [ConfigService] }
+
+Explanation: inject → tells NestJS what dependencies to provide to the
+factory function.
+
+5. Module Scopes
+
+NestJS providers can have different scopes.
+
+DEFAULT Scope
+
+Singleton (one instance for entire application).
+
+Example:
+
+@Injectable() export class UserService {}
+
+Meaning: One instance used across all requests.
+
+REQUEST Scope
+
+New instance created for every request.
+
+Example:
+
+@Injectable({ scope: Scope.REQUEST }) export class RequestService {}
+
+Meaning: Each HTTP request gets its own service instance.
+
+TRANSIENT Scope
+
+New instance created every time the provider is injected.
+
+Example:
+
+@Injectable({ scope: Scope.TRANSIENT }) export class LoggerService {}
+
+Meaning: Every injection creates a new instance.
+
+6. forwardRef
+
+forwardRef solves circular dependency problems.
+
+Circular Dependency Example:
+
+UserService → AuthService AuthService → UserService
+
+Without forwardRef NestJS cannot resolve dependencies.
+
+Solution:
+
+@Injectable() export class AuthService { constructor(
+@Inject(forwardRef(() => UserService)) private userService: UserService
+) {} }
+
+Module Example:
+
+@Module({ imports: [forwardRef(() => AuthModule)] })
+
+Explanation: forwardRef delays dependency resolution until runtime.
+
+Example Flow of Dynamic Module
+
+AppModule ↓ AuthModule.registerAsync() ↓ Factory Function Executes ↓
+Provider Created ↓ Provider Injected into Services
+
+SUMMARY
+
+Concept Purpose
+
+Dynamic Modules Configure modules dynamically registerAsync Async module
+configuration useFactory Create provider using factory inject Inject
+dependencies into factory Module Scopes Control provider lifecycle
+forwardRef Resolve circular dependencies
+
+Real Example (JWT Module)
+
+JwtModule.registerAsync({ useFactory: async (configService) => ({
+secret: configService.get(‘JWT_SECRET’), signOptions: { expiresIn: ‘1h’
+} }), inject: [ConfigService] })
+
+Flow:
+
+ConfigService ↓ useFactory executes ↓ JWT module configured dynamically
