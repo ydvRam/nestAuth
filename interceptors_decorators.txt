@@ -1,0 +1,160 @@
+INTERCEPTORS & CUSTOM DECORATORS
+
+1. NestInterceptor
+
+An Interceptor in NestJS is a class that can intercept and modify the
+request or response before it reaches the controller or before the
+response is sent back to the client.
+
+Uses: - Transform responses - Logging - Error handling - Performance
+monitoring
+
+Structure:
+
+import { Injectable, NestInterceptor, ExecutionContext, CallHandler }
+from ‘@nestjs/common’; import { Observable } from ‘rxjs’; import { map }
+from ‘rxjs/operators’;
+
+@Injectable() export class TransformInterceptor implements
+NestInterceptor {
+
+intercept(context: ExecutionContext, next: CallHandler): Observable {
+
+    return next.handle().pipe(
+      map(data => ({
+        status: "success",
+        data: data
+      }))
+    );
+
+}
+
+}
+
+Explanation: NestInterceptor → Interface used to create interceptors.
+intercept() → Method executed before/after request. context → Gives
+request details. next.handle() → Calls the next handler (controller).
+pipe(map()) → Used to transform response.
+
+Example Response:
+
+Before interceptor: { “name”: “ramu” }
+
+After interceptor: { “status”: “success”, “data”: { “name”: “ramu” } }
+
+2. CallHandler
+
+CallHandler represents the next function in the request pipeline.
+
+It allows the interceptor to continue execution.
+
+Structure:
+
+next.handle()
+
+handle() returns an Observable.
+
+Example:
+
+intercept(context: ExecutionContext, next: CallHandler) { return
+next.handle(); }
+
+Meaning: Continue execution and call the controller method.
+
+3. Observable
+
+Observable is a concept from RxJS used for handling asynchronous data
+streams.
+
+NestJS uses Observables internally.
+
+Example:
+
+import { Observable } from ‘rxjs’;
+
+intercept(context: ExecutionContext, next: CallHandler): Observable {
+return next.handle(); }
+
+Why Observables? - Handle async operations - Allow data transformation -
+Allow chaining operators like map(), catchError()
+
+4. Response Transformation
+
+Interceptors can modify the response before it is sent to the client.
+
+Example:
+
+map(data => ({ status: “success”, result: data }))
+
+Controller Response:
+
+{ “name”: “ramu” }
+
+Client Receives:
+
+{ “status”: “success”, “result”: { “name”: “ramu” } }
+
+5. Custom Parameter Decorators (createParamDecorator)
+
+Custom parameter decorators allow extracting specific data from the
+request.
+
+Example: Get logged-in user.
+
+import { createParamDecorator, ExecutionContext } from ‘@nestjs/common’;
+
+export const CurrentUser = createParamDecorator( (data: unknown, ctx:
+ExecutionContext) => {
+
+    const request = ctx.switchToHttp().getRequest();
+
+    return request.user;
+
+}, );
+
+Usage in Controller:
+
+@Get() getProfile(@CurrentUser() user) { return user; }
+
+Explanation: createParamDecorator → Used to create custom decorators.
+ctx.switchToHttp() → Switch to HTTP request context. getRequest() →
+Access request object. request.user → Value added by authentication
+guard.
+
+6. Metadata Decorators (@SetMetadata)
+
+Metadata decorators allow attaching custom information to routes.
+
+Example: Role based access.
+
+import { SetMetadata } from ‘@nestjs/common’;
+
+export const Roles = (…roles: string[]) => SetMetadata(‘roles’, roles);
+
+Usage:
+
+@Roles(‘admin’) @Get() findAllUsers() { return []; }
+
+Explanation: SetMetadata(key, value) key → metadata name value →
+metadata value
+
+Later this metadata can be read inside Guards.
+
+Example in Guard:
+
+const roles = this.reflector.get<string[]>(‘roles’,
+context.getHandler());
+
+SUMMARY
+
+Concept Purpose
+
+NestInterceptor Intercept and modify requests/responses CallHandler
+Calls next handler in pipeline Observable Async stream used by NestJS
+Response Transformation Modify API responses createParamDecorator Create
+custom parameter decorators @SetMetadata Attach metadata to routes
+
+Typical Real Flow
+
+Client Request ↓ Guard ↓ Interceptor (before) ↓ Controller ↓ Interceptor
+(after) ↓ Client Response
